@@ -108,28 +108,28 @@ class Mp2Client:
             try:
                 # Check if the seller credentials are valid
                 cursor = self.conn.cursor()
-                cursor.execute("SELECT * FROM sellers WHERE seller_id = %s AND subscriber_key = %s", (seller_id, sub_key))
+                cursor.execute("SELECT * FROM seller_subscription WHERE seller_id = %s AND subscriber_key = %s", (seller_id, sub_key))
                 seller = cursor.fetchone()
                 cursor.close()
 
                 if seller is None:
-                    print("ERROR: Seller id or subscriber key is wrong.")
-                    return None, CMD_EXECUTION_FAILED
+                    return None, USER_SIGNIN_FAILED
 
                 # Check if the seller is out of sessions
-                if seller['session_count'] >= seller['max_parallel_sessions']:
-                    print("ERROR: You are out of sessions for signing in.")
-                    return None, CMD_EXECUTION_FAILED
+                print(seller)
+                
+                if seller[2] >= seller[3]:
+                    return None, USER_ALL_SESSIONS_ARE_USED
 
                 # Increment the session count for the seller
                 cursor = self.conn.cursor()
-                cursor.execute("UPDATE sellers SET session_count = session_count + 1 WHERE seller_id = %s", (seller_id,))
+                cursor.execute("UPDATE seller_subscription SET session_count = session_count + 1 WHERE seller_id = %s", (seller_id,))
                 self.conn.commit()
                 cursor.close()
 
                 print("OK")
                 print(seller_id, ">")
-                print(seller['session_count'] + 1)
+                print(seller[2] + 1)
                 return seller, CMD_EXECUTION_SUCCESS
             except psycopg2.Error as e:
                 print("Error signing in:", e)
