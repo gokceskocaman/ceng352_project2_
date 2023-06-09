@@ -146,7 +146,36 @@ class Mp2Client:
     """
     def sign_out(self, seller):
         # TODO: implement this function
-        return False, CMD_EXECUTION_FAILED
+        try:
+            # Fetch the seller's session count
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM seller_subscription WHERE seller_id = %s", (seller,))
+            seller1= cursor.fetchone()
+            session_count = seller1[2]
+            cursor.close()
+            print(session_count)
+
+            
+
+            # Check if the session count is at least 0
+            if session_count < 0:
+                print("ERROR: Can not execute the given command.")
+                return False, CMD_EXECUTION_FAILED
+
+            # Decrement the session count
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE seller_subscription SET session_count = session_count - 1 WHERE seller_id = %s", (seller,))
+            self.conn.commit()
+            cursor.close()
+
+            self.authenticated = False
+            self.seller_id = None
+            return True, CMD_EXECUTION_SUCCESS
+        except Exception as e:
+            print("ERROR: Can not execute the given command.")
+            print(e)
+            return False, CMD_EXECUTION_FAILED
+          
 
 
     """
