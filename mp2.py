@@ -130,7 +130,7 @@ class Mp2Client:
                 print("OK")
                 print(seller_id, ">")
                 print(seller[2] + 1)
-                return seller, CMD_EXECUTION_SUCCESS
+                return seller[0], CMD_EXECUTION_SUCCESS
             except psycopg2.Error as e:
                 print("Error signing in:", e)
                 return None, CMD_EXECUTION_FAILED
