@@ -5,6 +5,13 @@ import psycopg2
 from config import read_config
 from messages import *
 
+import configparser
+
+def read_config(filename, section):
+    cfg= configparser.ConfigParser()
+    cfg.read(filename)
+    return {option: cfg.get(section, option) for option in cfg.options(section)}
+
 """
     Splits given command string by spaces and trims each token.
     Returns token list.
@@ -160,7 +167,8 @@ class Mp2Client:
             session_count = seller1[2]
             cursor.close()
 
-
+            if seller is None:
+                return False, CMD_EXECUTION_FAILED
             
 
             # Check if the session count is at least 0
@@ -193,7 +201,12 @@ class Mp2Client:
     """
     def quit(self, seller):
         # TODO: implement this function
-        return False, CMD_EXECUTION_FAILED
+        try:
+            if seller is not None:
+                self.sign_out(seller)       
+            return True, CMD_EXECUTION_SUCCESS
+        except Exception as e:
+            return False, CMD_EXECUTION_FAILED
 
 
     """
@@ -458,6 +471,7 @@ class Mp2Client:
     """
     def calc_gross(self, seller):
         # TODO: implement this function
+       
         return False, CMD_EXECUTION_FAILED
 
     """
@@ -474,7 +488,22 @@ class Mp2Client:
     """
     def show_cart(self, customer_id):
         # TODO: implement this function
-        return False, CMD_EXECUTION_FAILED
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM customer_carts WHERE customer_id = %s", (customer_id,))
+            shopping_cart = cursor.fetchall()
+            cursor.close()
+            if shopping_cart is None:
+                return False, CMD_EXECUTION_FAILED
+            
+            print("Seller Id|Product Id|Amount")
+            for item in shopping_cart:
+                print(item[1], item[2], item[3])
+            return True, CMD_EXECUTION_SUCCESS
+
+        except Exception as e:
+            print(e)
+            return False, CMD_EXECUTION_FAILED
         
     """
         Change count of items in shopping cart
@@ -487,7 +516,40 @@ class Mp2Client:
     """
     def change_cart(self, customer_id, product_id, seller_id, change_amount):
         # TODO: implement this function
-        return False, CMD_EXECUTION_FAILED
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM customers WHERE customer_id = %s", (customer_id,))
+            customer = cursor.fetchone()
+            cursor.close()
+            if customer is None:
+                return False, CUSTOMER_NOT_FOUND
+            
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM products WHERE product_id = %s", (product_id,))
+            product = cursor.fetchone()
+            cursor.close()
+            if product is None:
+                return False, PRODUCT_NOT_FOUND
+            
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM seller_stocks WHERE seller_id = %s AND product_id = %s", (seller_id, product_id))
+            seller_stock = cursor.fetchone()
+            cursor.close()
+            if seller_stock is None:
+                return False, CMD_EXECUTION_FAILED
+            
+            if seller_stock[2] < change_amount:
+                return False, CMD_EXECUTION_FAILED
+            
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE customer_carts SET amount = amount + %s WHERE customer_id = %s AND product_id = %s AND seller_id = %s", (change_amount, customer_id, product_id, seller_id))
+            self.conn.commit()
+            cursor.close()
+            return True, CMD_EXECUTION_SUCCESS
+
+        except Exception as e:
+            print(e)
+            return False, CMD_EXECUTION_FAILED
     
     """
         Purchases items on the cart
@@ -503,4 +565,45 @@ class Mp2Client:
     """
     def purchase_cart(self, customer_id):
         # TODO: implement this function
-        return False, CMD_EXECUTION_FAILED
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM customer_carts WHERE customer_id = %s", (customer_id,))
+            shopping_cart = cursor.fetchall()
+            cursor.close()
+            if shopping_cart is None:
+                return False, CUSTOMER_NOT_FOUND
+            
+            for item in shopping_cart:
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT * FROM seller_stocks WHERE seller_id = %s AND product_id = %s", (item[1], item[2]))
+                seller_stock = cursor.fetchone()
+                cursor.close()
+                if seller_stock is None:
+                    return False, CMD_EXECUTION_FAILED
+                
+                if seller_stock[2] < item[3]:
+                    return False, CMD_EXECUTION_FAILED
+                
+            for item in shopping_cart:
+                cursor = self.conn.cursor()
+                cursor.execute("UPDATE seller_stocks SET stock_count = stock_count - %s WHERE seller_id = %s AND product_id = %s", (item[3], item[1], item[2]))
+                self.conn.commit()
+                cursor.close()
+                
+                cursor = self.conn.cursor()
+                cursor.execute("DELETE FROM customer_carts WHERE customer_id = %s AND product_id = %s AND seller_id = %s", (customer_id, item[2], item[1]))
+                self.conn.commit()
+                cursor.close()
+                
+                cursor = self.conn.cursor()
+                cursor.execute("INSERT INTO order_items (order_id, seller_id, product_id, amount) VALUES (%s, %s, %s, %s)", (item[0], item[1], item[2], item[3]))
+                self.conn.commit()
+                cursor.close()
+                
+    
+            
+            return True, CMD_EXECUTION_SUCCESS
+
+        except Exception as e:
+            print(e)    
+            return False, CMD_EXECUTION_FAILED
