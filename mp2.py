@@ -204,7 +204,20 @@ class Mp2Client:
     """
     def show_plans(self):
         # TODO: implement this function
-        return False, CMD_EXECUTION_FAILED
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM subscription_plans")
+            plans = cursor.fetchall()
+            cursor.close()
+
+            print("#|Name|Max Sessions|Max Stocks Per Product")
+            for plan in plans:
+                print(str(plan[0]) + "|" + plan[1] + "|" + str(plan[2]) + "|" + str(plan[3]))
+            return True, CMD_EXECUTION_SUCCESS
+
+        except Exception as e:
+            print(e)
+            return False, CMD_EXECUTION_FAILED
     
     def show_subscription(self, seller):
         # TODO: implement this function
