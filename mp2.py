@@ -116,10 +116,18 @@ class Mp2Client:
                     return None, USER_SIGNIN_FAILED
 
                 # Check if the seller is out of sessions
-                print(seller)
-                
-                if seller[2] >= seller[3]:
+                cursor = self.conn.cursor()
+                cursor.execute("select * from subscription_plans where plan_id = %s", (seller[3],))
+                plan = cursor.fetchone()
+                cursor.close()
+               
+                # print seller and plan
+
+
+                if(seller[2] >= plan[2]):
                     return None, USER_ALL_SESSIONS_ARE_USED
+                
+               
 
                 # Increment the session count for the seller
                 cursor = self.conn.cursor()
@@ -127,9 +135,7 @@ class Mp2Client:
                 self.conn.commit()
                 cursor.close()
 
-                print("OK")
-                print(seller_id, ">")
-                print(seller[2] + 1)
+
                 return seller[0], CMD_EXECUTION_SUCCESS
             except psycopg2.Error as e:
                 print("Error signing in:", e)
@@ -221,7 +227,21 @@ class Mp2Client:
     
     def show_subscription(self, seller):
         # TODO: implement this function
-        return False, CMD_EXECUTION_FAILED
+        # bitmedi
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM seller_subscription WHERE seller_id = %s", (seller,))
+            subscription = cursor.fetchone()
+            cursor.close()
+
+            print("#|Name|Max Sessions|Max Stocks Per Product")
+            print(str(subscription[0]) + "|" + subscription[1] + "|" + str(subscription[2]) + "|" + str(subscription[3]))
+            return True, CMD_EXECUTION_SUCCESS
+        
+        except Exception as e:
+            print(e)
+            return False, CMD_EXECUTION_FAILED
+    
     
     """
         Change stock count of a product.
