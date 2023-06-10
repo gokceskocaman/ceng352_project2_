@@ -229,10 +229,20 @@ class Mp2Client:
         # TODO: implement this function
         # bitmedi
         try:
+            
+
             cursor = self.conn.cursor()
             cursor.execute("SELECT * FROM seller_subscription WHERE seller_id = %s", (seller,))
             subscription = cursor.fetchone()
             cursor.close()
+
+            plan_id = subscription[3]
+
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM subscription_plans WHERE plan_id = %s", (plan_id,))
+            subscription = cursor.fetchone()
+            cursor.close()
+
 
             print("#|Name|Max Sessions|Max Stocks Per Product")
             print(str(subscription[0]) + "|" + subscription[1] + "|" + str(subscription[2]) + "|" + str(subscription[3]))
