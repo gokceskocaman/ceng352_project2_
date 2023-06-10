@@ -263,7 +263,52 @@ class Mp2Client:
     """
     def change_stock(self, seller, product_id, change_amount):
         # TODO: implement this function
-        return False, CMD_EXECUTION_FAILED
+        
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM seller_stocks WHERE product_id = %s", (product_id,))
+            seller_stock = cursor.fetchone()
+            cursor.close()
+
+           
+
+            if seller_stock is None:
+                return False, PRODUCT_NOT_FOUND
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM seller_subscription WHERE seller_id = %s", (seller,))
+            seller_subscription = cursor.fetchone()
+            cursor.close()
+            plan_id = seller_subscription[3]
+            
+
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM subscription_plans WHERE plan_id = %s", (plan_id,))
+            subscription_plan = cursor.fetchone()
+            cursor.close()
+            max_stock_per_product = subscription_plan[3]
+           
+
+            if seller_stock[2] + change_amount > max_stock_per_product:
+                return False, QUOTA_LIMIT_REACHED
+            if seller_stock[2] + change_amount < 0:
+                return False, QUOTA_LIMIT_REACHED
+
+            
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE seller_stocks SET stock_count = stock_count + %s WHERE product_id = %s and seller_id = %s", (change_amount, product_id, seller))
+            self.conn.commit()
+            cursor.close()
+            print(CMD_EXECUTION_SUCCESS)
+            return seller, CMD_EXECUTION_SUCCESS
+            
+           
+           
+
+        
+        except Exception as e:
+            print(e)
+            return False, CMD_EXECUTION_FAILED
+       
 
 
     """
