@@ -71,7 +71,7 @@ class Mp2Client:
                 return False, CMD_EXECUTION_FAILED
             cursor.close()
 
-            print(seller_id, sub_key, zip, city, state, plan_id)
+    
             # Insert the new seller into the sellers table
             cursor = self.conn.cursor()
             cursor.execute(
@@ -159,7 +159,7 @@ class Mp2Client:
             seller1= cursor.fetchone()
             session_count = seller1[2]
             cursor.close()
-            print(session_count)
+
 
             
 
@@ -302,7 +302,7 @@ class Mp2Client:
             return seller, CMD_EXECUTION_SUCCESS
             
            
-           
+        
 
         
         except Exception as e:
@@ -327,7 +327,35 @@ class Mp2Client:
     """
     def show_quota(self, seller):
         # TODO: implement this function
-        return False, CMD_EXECUTION_FAILED
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM seller_subscription WHERE seller_id = %s", (seller,))
+            seller_subscription = cursor.fetchone()
+            cursor.close()
+            plan_id = seller_subscription[3]
+
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM subscription_plans WHERE plan_id = %s", (plan_id,))
+            subscription_plan = cursor.fetchone()
+            cursor.close()
+            max_stock_per_product = subscription_plan[3]
+
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM seller_stocks WHERE seller_id = %s", (seller,))
+            seller_stocks = cursor.fetchall()
+            cursor.close()
+            if len(seller_stocks) == 0:
+                print("Quota limit is not activated yet.")
+                return True, QUOTA_INACTIVE
+            print("Product Id|Remaining Quota")
+            for stock in seller_stocks:
+                print(stock[1] + "|" + str(max_stock_per_product - stock[2]))
+            return True, CMD_EXECUTION_SUCCESS
+        
+        except Exception as e:
+            print(e)
+            return False, CMD_EXECUTION_FAILED
+        
 
     """
         Subscribe authenticated seller to new plan.
@@ -339,7 +367,39 @@ class Mp2Client:
     """
     def subscribe(self, seller, plan_id):
         # TODO: implement this function
-        return None, CMD_EXECUTION_FAILED
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM subscription_plans WHERE plan_id = %s", (plan_id,))
+            subscription_plan = cursor.fetchone()
+            cursor.close()
+            if subscription_plan is None:
+                return None, PRODUCT_NOT_FOUND
+            
+            new_plan_max_parallel_sessions = subscription_plan[2]
+
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM seller_subscription WHERE seller_id = %s", (seller,))
+            seller_subscription = cursor.fetchone()
+            cursor.close()
+            old_plan_id = seller_subscription[3]
+
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM subscription_plans WHERE plan_id = %s", (old_plan_id,))
+            old_subscription_plan = cursor.fetchone()
+            cursor.close()
+            old_plan_max_parallel_sessions = old_subscription_plan[2]
+
+            if new_plan_max_parallel_sessions < old_plan_max_parallel_sessions:
+                return None, SUBSCRIBE_MAX_PARALLEL_SESSIONS_UNAVAILABLE
+
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE seller_subscription SET plan_id = %s WHERE seller_id = %s", (plan_id, seller))
+            self.conn.commit()
+            cursor.close()
+            return seller, CMD_EXECUTION_SUCCESS
+        except Exception as e:
+            print(e)
+            return None, CMD_EXECUTION_FAILED
 
     """
         Change stock amounts for multiple distinct products.
@@ -352,7 +412,37 @@ class Mp2Client:
     """
     def ship(self, seller, product_ids):
         # TODO: implement this function
-        return False, CMD_EXECUTION_FAILED
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM seller_stocks WHERE seller_id = %s", (seller,))
+            seller_stocks = cursor.fetchall()
+            cursor.close()
+
+           
+
+
+            for product_id in product_ids:
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT * FROM seller_stocks WHERE product_id = %s and seller_id = %s", (product_id, seller))
+                seller_stock = cursor.fetchone()
+                cursor.close()
+                if seller_stock is None:
+                    return False, CMD_EXECUTION_FAILED
+                
+                if seller_stock[2] == 0:
+                    return False, CMD_EXECUTION_FAILED
+                
+            for product_id in product_ids: 
+                cursor = self.conn.cursor()
+                cursor.execute("UPDATE seller_stocks SET stock_count = stock_count - 1 WHERE seller_id = %s AND product_id = %s", (seller, product_id))
+                self.conn.commit()
+                cursor.close()
+            return True, CMD_EXECUTION_SUCCESS
+        
+        except Exception as e:
+            print(e)
+            return False, CMD_EXECUTION_FAILED
+      
     
 
     """
